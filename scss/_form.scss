@@ -1,0 +1,72 @@
+// form auth
+// form
+.tf-form {
+    .tf-title {
+        margin-top: 20px;
+        margin-bottom: 28px;
+    }
+
+    .group-input {
+        position: relative;
+        label {
+            position: absolute;
+            top: -11px;
+            background-color: #ffff;
+            padding: 0px 5px;
+            left: 12px;
+        }
+    }
+
+    .btn-large {
+        margin-top: 28px;
+    }
+}
+.auth-pass-input {
+    position: relative;
+    .password-addon {
+        position: absolute;
+        right: 14px;
+        top: 14px;
+        font-size: 18px;
+    }
+}
+.auth-forgot-password {
+    color: $secondary_color;
+    display: inline-block;
+}
+
+.tf-form-verify {
+    .tf-title {
+        font-size: 16px;
+        line-height: 24px;
+    }
+    .group-input-verify {
+        margin: 0px 0px 12px;
+        justify-content: center;
+
+        .input-verify {
+            display: block;
+            width: 58px;
+            height: 58px;
+            margin-right: 12px;
+            text-align: center;
+            font-size: 22px;
+            line-height: 30px;
+            font-weight: 600;
+            &:last-child {
+                margin-right: 0;
+            }
+            &:focus {
+                border-color: $on_surface_color;
+            }
+        }
+    }
+    .text-send-code {
+        p {
+            font-size: 14px;
+            line-height: 22px;
+            display: flex;
+            justify-content: center;
+        }
+    }
+}

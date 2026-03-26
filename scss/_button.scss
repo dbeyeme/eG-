@@ -1,0 +1,163 @@
+// button
+.tf-btn {
+    width: 100%;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 24px;
+    text-transform: capitalize;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+
+    &.accent {
+        background-color: $primary_color;
+        border: 1px solid $primary_color;
+        color: $white_color;
+        &:hover {
+            color: $primary_color;
+            background-color: $white_color;
+        }
+    }
+    
+    &.secondary{
+        background-color: $secondary_color;
+        border: 1px solid $secondary_color;
+        color: $white_color;
+        &:hover {
+            color: $secondary_color;
+            background-color: $white_color;
+        }
+    }
+    &.success{
+        background-color: $success_color;
+        border: 1px solid $success_color;
+        color: $white_color;
+        &:hover {
+            color: $success_color;
+            background-color: $white_color;
+        }
+    }
+    &.danger{
+        background-color: $critical_color;
+        border: 1px solid $critical_color;
+        color: $white_color;
+        &:hover {
+            color: $critical_color;
+            background-color: $white_color;
+        } 
+    }
+    &.warning{
+        background-color: $warning_color;
+        border: 1px solid $warning_color;
+        color: $white_color; 
+        &:hover {
+            color: $warning_color;
+            background-color: $white_color;
+        }
+    }
+    &.dark{
+        background-color: $on_surface_color;
+        border: 1px solid $on_surface_color;
+        color: $white_color; 
+        &:hover {
+            color: $on_surface_color;
+            background-color: $white_color;
+        }
+    }
+
+    &.light {
+        color: $on_surface_color;
+        background-color: $bg_light_color;
+        border: 1px solid $bg_light_color;
+        &:hover {
+            background-color: $white_color;
+        }
+
+    }
+
+    &.outline {
+        color: $primary_color;
+        border: 1px solid $primary_color;
+        background-color: $white_color;
+        &:hover {
+            background-color: $primary_color;
+            border: 1px solid $primary_color;
+            color: $white_color;
+        }
+    }
+    &.outline-secondary {
+        color: $secondary_color;
+        border: 1px solid $secondary_color;
+        background-color: $white_color;
+        &:hover {
+            background-color: $secondary_color;
+            border: 1px solid $secondary_color;
+            color: $white_color;
+        }
+    }
+    &.outline-success {
+        color: $success_color;
+        border: 1px solid $success_color;
+        background-color: $white_color;
+        &:hover {
+            background-color: $success_color;
+            border: 1px solid $success_color;
+            color: $white_color;
+        }
+    }
+    &.outline-danger {
+        color: $critical_color;
+        border: 1px solid $critical_color;
+        background-color: $white_color;
+        &:hover {
+            background-color: $critical_color;
+            border: 1px solid $critical_color;
+            color: $white_color;
+        }
+    }
+    &.outline-warning {
+        color: $warning_color;
+        border: 1px solid $warning_color;
+        background-color: $white_color;
+        &:hover {
+            background-color: $warning_color;
+            border: 1px solid $warning_color;
+            color: $white_color;
+        }
+    }
+    &.outline-light {
+        color: $on_surface_color;
+        border: 1px solid $bg_light_color;
+        background-color: $white_color;
+        &:hover {
+            background-color: $bg_light_color;
+            border: 1px solid $bg_light_color;
+        }
+    }
+    &.outline-dark {
+        color: $on_surface_color;
+        border: 1px solid $on_surface_color;
+        background-color: $white_color;
+        &:hover {
+            color: $white_color;
+            background-color: $on_surface_color;
+            border: 1px solid $on_surface_color;
+        }
+    }
+    &.btn-square{
+        border-radius: 0;
+    }
+
+    &.large {
+        padding: 12px 20px;
+    }
+    &.medium {
+        padding: 10px 20px;
+    }
+    &.small {
+        padding: 7px 20px;
+    }
+}
+
