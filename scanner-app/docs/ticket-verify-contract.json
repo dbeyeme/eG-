@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Voyageur241 Ticket Verify",
+  "description": "Contrat JSON entre l’app scanner et l’API voyageur241.com pour authentifier un billet à l’embarquement.",
+  "request": {
+    "method": "POST",
+    "url": "{VITE_API_BASE_URL}{VITE_API_TICKET_VERIFY_PATH}",
+    "example": "https://voyageur241.com/api/v1/tickets/verify",
+    "headers": {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Origin": "{VITE_CORS_ORIGIN}"
+    },
+    "body": {
+      "qrPayload": "https://voyageur241.com/ticket/TKT-2512-032",
+      "ticketNumber": "TKT-2512-032",
+      "agentId": "Agent_1",
+      "scannedAt": "2026-07-24T03:15:00.000Z",
+      "channel": "ios",
+      "appVersion": "0.2.0"
+    }
+  },
+  "response_success": {
+    "ok": true,
+    "status": "valid",
+    "message": "Ticket authentifié",
+    "verificationId": "ver_9f3a2c",
+    "ticket": {
+      "number": "TKT-2512-032",
+      "passengerName": "MIDIAKA FOSTEL E",
+      "route": "LIBREVILLE - MOANDA",
+      "travelDate": "29/12/2025",
+      "boardingTime": "06:00",
+      "fare": "35000 F"
+    }
+  },
+  "response_already_scanned": {
+    "ok": false,
+    "status": "already_scanned",
+    "message": "Ticket déjà contrôlé à l’embarquement",
+    "ticket": {
+      "number": "TKT-2512-032",
+      "passengerName": "MIDIAKA FOSTEL E",
+      "route": "LIBREVILLE - MOANDA",
+      "travelDate": "29/12/2025",
+      "boardingTime": "06:00",
+      "fare": "35000 F"
+    }
+  },
+  "response_mismatch": {
+    "ok": false,
+    "status": "mismatch",
+    "message": "Les données scannées ne correspondent pas au billet en base",
+    "mismatches": ["passengerName", "route"],
+    "ticket": {
+      "number": "TKT-2512-032",
+      "passengerName": "MIDIAKA FOSTEL E",
+      "route": "LIBREVILLE - MOANDA",
+      "travelDate": "29/12/2025",
+      "boardingTime": "06:00",
+      "fare": "35000 F"
+    }
+  },
+  "api_check_rules": [
+    "Résoudre le billet via qrPayload (URL/id) ou ticketNumber",
+    "Fiche voyage : nom_passager, segment localité A→B (trajet_tarif), voyage.jour, heure manifeste ou config, montant ticket",
+    "Comparer number, passengerName, route, travelDate, boardingTime, fare si présents dans le QR",
+    "Si billet absent → status not_found",
+    "Si déjà embarqué → status already_scanned",
+    "Si champs divergents → status mismatch + mismatches[]",
+    "Sinon → status valid + ticket canonique renvoyé",
+    "Provisoire (scanner-api + MySQL voyageur-241) : ticket sans manifeste_id → status invalid",
+    "CORS: Access-Control-Allow-Origin = VITE_CORS_ORIGIN (ou liste d’origines scanner)"
+  ],
+  "cors_example": {
+    "Access-Control-Allow-Origin": "https://scanner-voyageur241.vercel.app",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Accept, X-Client-Origin, Authorization"
+  }
+}

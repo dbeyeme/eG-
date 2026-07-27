@@ -1,0 +1,7 @@
+.DS_Store
+/voyageur-241.sql
+/voyageur-241.sql.zip
+*.sql.zip
+.env
+.env.local
+.env.*.local

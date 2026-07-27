@@ -1,0 +1,17 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: voyageur241-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: voyageur-241
+    volumes:
+      - voyageur241_mysql:/var/lib/mysql
+      - ../voyageur-241.sql:/docker-entrypoint-initdb.d/01-dump.sql:ro
+      - ./sql/001_ticket_scan.sql:/docker-entrypoint-initdb.d/02-ticket_scan.sql:ro
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+
+volumes:
+  voyageur241_mysql:

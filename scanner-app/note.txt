@@ -1,0 +1,5 @@
+Lancer :
+cd scanner-app
+npm run dev          # web
+npm run cap:ios      # sync natif iOS
+npm run cap:open:ios

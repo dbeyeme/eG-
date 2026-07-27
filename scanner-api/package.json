@@ -1,0 +1,33 @@
+{
+  "name": "scanner-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "db:migrate-scans": "tsx src/migrate-scans.ts",
+    "db:smoke": "tsx src/smoke.ts",
+    "fixtures:tickets": "tsx scripts/generate-ticket-pdfs.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "jose": "^6.2.4",
+    "mysql2": "^3.14.3",
+    "pdfkit": "^0.19.1",
+    "qrcode": "^1.5.4",
+    "tsx": "^4.20.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.13.2",
+    "@types/pdfkit": "^0.17.6",
+    "@types/qrcode": "^1.5.6",
+    "typescript": "~6.0.2"
+  }
+}

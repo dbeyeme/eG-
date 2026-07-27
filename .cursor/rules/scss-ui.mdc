@@ -1,0 +1,12 @@
+---
+description: Styles SCSS / UI mobile Voyageur241
+globs: "scss/**/*.{scss,css},styles/**/*.css"
+alwaysApply: false
+---
+
+# SCSS / UI
+
+- Sources dans `scss/` ; build attendu vers `styles/styles.css`.
+- Variables dans `scss/variables.scss` — réutiliser avant d'inventer.
+- Mobile-first, portrait, safe-area / viewport-fit cover déjà dans `header.php`.
+- Ne pas introduire de design system cards/dashboard générique ; coller au look Alipay-like existant.

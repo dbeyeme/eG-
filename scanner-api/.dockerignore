@@ -1,0 +1,9 @@
+# Created by Railway deploy — do not commit secrets
+node_modules
+dist
+.env
+.env.*.local
+*.log
+.DS_Store
+.railway
+fixtures

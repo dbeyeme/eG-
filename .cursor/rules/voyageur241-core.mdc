@@ -1,0 +1,13 @@
+---
+description: Conventions core Voyageur241 (PWA PHP contrôle billets)
+alwaysApply: true
+---
+
+# Voyageur241
+
+- App contrôleurs voyage : PHP pages + jQuery/Bootstrap/Swiper + html5-qrcode.
+- UI en français. Marque **Voyageur241**, accent `#58d68d`.
+- Toujours `include 'header.php'` / `footer.php` sur les pages.
+- Préserver classes `tf-*` et le pattern mobile portrait existant.
+- État scan tickets : `localStorage.scannedTickets` (voir `footer.php`).
+- Hermes : orchestrateur `voyageur-orchestrator` + sous-profils php/ui/scanner/reviewer.

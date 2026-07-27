@@ -1,0 +1,22 @@
+---
+description: Patterns des pages PHP Voyageur241
+globs: "**/*.php"
+alwaysApply: false
+---
+
+# Pages PHP
+
+```php
+<?php
+include 'header.php';
+?>
+<!-- body content -->
+<?php
+include 'footer.php';
+?>
+```
+
+- Garder le preload (`preload-container`) si la page en a un.
+- Formulaires : classes `tf-form`, `group-input`, `tf-btn accent large`.
+- Pas d'API backend pour l'instant — logique côté client OK.
+- Éviter d'ajouter des dépendances PHP ; rester pages plates.
