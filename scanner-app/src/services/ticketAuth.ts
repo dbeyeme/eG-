@@ -123,7 +123,6 @@ async function verifyWithApi(
       'Content-Type': 'application/json',
       Accept: 'application/json',
       'X-Client-Origin': appConfig.corsOrigin,
-      Origin: appConfig.corsOrigin,
     };
     if (token) {
       headers.Authorization = `Bearer ${token}`;
