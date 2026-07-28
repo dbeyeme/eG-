@@ -178,7 +178,8 @@ export async function authenticateTicket(
     ...emptyTripFields(),
     number: local.number,
     status: 'invalid',
-    message: 'API indisponible — impossible de vérifier le billet',
+    message:
+      'Contrôle en base impossible (API indisponible). Aucune validation simulée.',
   };
   await saveScannedTicket(offline);
   return { ticket: offline, isDuplicate: false, fromApi: false };

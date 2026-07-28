@@ -19,11 +19,13 @@ const STATUS_LABEL: Record<TicketStatus, string> = {
 };
 
 function statusLabel(ticket: TicketInfo): string {
+  if (ticket.status === 'valid') return 'Ticket vérifié en base';
   if (ticket.reason === 'unknown_qr') return 'QR hors Voyageur241';
-  if (ticket.reason === 'not_on_manifeste') return 'Hors manifeste';
   if (ticket.reason === 'wrong_agence') return 'Hors agence';
   if (ticket.reason === 'deleted') return 'Ticket annulé';
   if (ticket.reason === 'not_found') return 'Ticket introuvable';
+  if (ticket.reason === 'already_scanned') return 'Déjà scanné';
+  if (ticket.reason === 'not_on_manifeste') return 'Hors manifeste';
   return STATUS_LABEL[ticket.status];
 }
 
@@ -59,8 +61,7 @@ export function TicketCard({ ticket }: { ticket: TicketInfo }) {
 
       {!details ? (
         <p className="ticket-card__hint">
-          Aucune fiche voyage à afficher. Scannez un billet Voyageur241 valide et inscrit au
-          manifeste.
+          Aucune fiche voyage à afficher. Vérifiez le numéro du billet Voyageur241 en base.
         </p>
       ) : (
         <dl className="ticket-fields">

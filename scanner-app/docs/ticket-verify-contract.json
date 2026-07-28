@@ -66,10 +66,12 @@
     "Fiche voyage : nom_passager, segment localité A→B (trajet_tarif), voyage.jour, heure manifeste ou config, montant ticket",
     "Comparer number, passengerName, route, travelDate, boardingTime, fare si présents dans le QR",
     "Si billet absent → status not_found",
+    "Si annulé/supprimé → status invalid + reason deleted",
     "Si déjà embarqué → status already_scanned",
+    "Si hors périmètre agence → status invalid + reason wrong_agence",
     "Si champs divergents → status mismatch + mismatches[]",
-    "Sinon → status valid + ticket canonique renvoyé",
-    "Provisoire (scanner-api + MySQL voyageur-241) : ticket sans manifeste_id → status invalid",
+    "Sinon → status valid (existe en base, non annulé, non scanné) + ticket canonique",
+    "Manifeste : informatif (onManifeste) — n’empêche plus le statut valid",
     "CORS: Access-Control-Allow-Origin = VITE_CORS_ORIGIN (ou liste d’origines scanner)"
   ],
   "cors_example": {

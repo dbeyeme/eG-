@@ -218,17 +218,9 @@ app.post('/api/v1/tickets/verify', requireAuth, async (req: AuthedRequest, res) 
       return;
     }
 
-    if (!isOnManifeste(row)) {
-      res.json({
-        ok: false,
-        status: 'invalid',
-        reason: 'not_on_manifeste',
-        message:
-          'Ticket connu mais non inscrit sur un manifeste — embarquement refusé',
-        ticket,
-      });
-      return;
-    }
+    // Embarquement : billet en base + non annulé + non déjà scanné.
+    // Le manifeste est informatif (beaucoup de billets vendus n’y sont pas encore).
+    const onManifeste = isOnManifeste(row);
 
     const existing = await findExistingScan(pool, row.id);
     if (existing) {
@@ -239,6 +231,7 @@ app.post('/api/v1/tickets/verify', requireAuth, async (req: AuthedRequest, res) 
         message: 'Ticket déjà contrôlé à l’embarquement',
         ticket,
         verificationId: existing.id,
+        onManifeste,
       });
       return;
     }
@@ -252,6 +245,7 @@ app.post('/api/v1/tickets/verify', requireAuth, async (req: AuthedRequest, res) 
         message: 'Les données scannées ne correspondent pas au billet en base',
         mismatches,
         ticket,
+        onManifeste,
       });
       return;
     }
@@ -267,9 +261,13 @@ app.post('/api/v1/tickets/verify', requireAuth, async (req: AuthedRequest, res) 
     res.json({
       ok: true,
       status: 'valid',
-      message: 'Ticket authentifié (présent en manifeste)',
+      reason: onManifeste ? undefined : 'not_on_manifeste',
+      message: onManifeste
+        ? 'Ticket authentifié en base — valide et non utilisé'
+        : 'Ticket authentifié en base — valide et non utilisé (hors manifeste)',
       verificationId,
       ticket,
+      onManifeste,
     });
   } catch (err) {
     console.error('verify error', err);

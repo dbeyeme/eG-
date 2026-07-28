@@ -46,4 +46,6 @@ export type TicketVerifyResponse = {
   mismatches?: Array<'number' | 'passengerName' | 'route' | 'travelDate' | 'boardingTime' | 'fare'>;
   /** Référence serveur */
   verificationId?: string;
+  /** Présence éventuelle sur un manifeste (informatif) */
+  onManifeste?: boolean;
 };
