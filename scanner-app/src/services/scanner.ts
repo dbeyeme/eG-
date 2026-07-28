@@ -175,11 +175,12 @@ async function startWithCamera(
   await scanner.start(
     cameraConfig,
     {
-      fps: 10,
-      // Dynamic box; visual overlay is ours (library shade is hidden in CSS)
+      // Higher fps + larger box = better detection of small / distant / invalid QR
+      fps: 20,
+      // Keep in sync with CSS --scan-frame (min(320px, 85% of stage))
       qrbox: (viewfinderWidth, viewfinderHeight) => {
         const side = Math.floor(
-          Math.min(280, viewfinderWidth * 0.72, viewfinderHeight * 0.55),
+          Math.min(320, Math.min(viewfinderWidth, viewfinderHeight) * 0.85),
         );
         return { width: side, height: side };
       },

@@ -205,7 +205,7 @@ export function ScanPage() {
     <div
       className={`page page-scan ${showLive ? 'page-scan--live' : ''} ${showLive && native ? 'page-scan--native-active' : ''}`}
     >
-      {!showLive ? <AppHeader title="Scan QR" /> : null}
+      <AppHeader title="Scan QR" />
 
       {!showLive ? (
         <div className="page-banner" aria-hidden>
@@ -349,10 +349,12 @@ export function ScanPage() {
           {showLive ? (
             <div className="scan-live">
               <div className="scan-reticle" aria-hidden>
-                <span className="scan-reticle__corner scan-reticle__corner--tl" />
-                <span className="scan-reticle__corner scan-reticle__corner--tr" />
-                <span className="scan-reticle__corner scan-reticle__corner--bl" />
-                <span className="scan-reticle__corner scan-reticle__corner--br" />
+                <span className="scan-reticle__frame">
+                  <span className="scan-reticle__corner scan-reticle__corner--tl" />
+                  <span className="scan-reticle__corner scan-reticle__corner--tr" />
+                  <span className="scan-reticle__corner scan-reticle__corner--bl" />
+                  <span className="scan-reticle__corner scan-reticle__corner--br" />
+                </span>
               </div>
 
               <div className="scan-live__bar">
@@ -363,7 +365,7 @@ export function ScanPage() {
                     </>
                   ) : (
                     <>
-                      <IconScan size={16} /> Alignez le QR dans le viseur
+                      <IconScan size={16} /> Alignez le QR dans le cadre
                     </>
                   )}
                 </p>

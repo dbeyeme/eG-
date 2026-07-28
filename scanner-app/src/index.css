@@ -481,22 +481,24 @@ a {
 }
 
 .scan-main--live {
-  max-width: none;
-  padding: 0;
   flex: 1;
+  min-height: 0;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 .page-scan--live {
-  background: #000;
+  background: var(--brand-bg);
   height: 100%;
+  min-height: 0;
 }
 
+/* Keep bottom nav usable while the camera is live */
 .app-shell:has(.page-scan--live) .bottom-nav {
-  display: none;
-}
-
-.app-shell:has(.page-scan--live) .app-shell__body {
-  padding-bottom: 0;
+  display: flex;
+  z-index: 50;
+  background: var(--brand-surface);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .scan-stage {
@@ -510,12 +512,14 @@ a {
 }
 
 .scan-stage--live {
+  --scan-frame: min(320px, 85%);
   background: #000;
-  min-height: 0;
-  height: 100%;
-  flex: 1;
-  border: none;
-  border-radius: 0;
+  flex: 1 1 auto;
+  min-height: min(58dvh, 480px);
+  max-height: min(65dvh, 560px);
+  height: auto;
+  border: 1px solid rgba(200, 255, 0, 0.28);
+  border-radius: var(--radius);
 }
 
 .scan-idle,
@@ -772,8 +776,7 @@ html[data-theme='light'] .scan-manual__error {
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
-  padding: 1.1rem max(1rem, var(--safe-left)) calc(1.1rem + var(--safe-bottom))
-    max(1rem, var(--safe-right));
+  padding: 1.1rem max(1rem, var(--safe-left)) 1.1rem max(1rem, var(--safe-right));
   background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.78) 40%);
   pointer-events: auto;
 }
@@ -794,13 +797,22 @@ html[data-theme='light'] .scan-manual__error {
 
 .scan-reticle {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  translate: -50% -54%;
-  width: min(240px, 68vw);
-  aspect-ratio: 1;
+  inset: 0;
   pointer-events: none;
   z-index: 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.scan-reticle__frame {
+  position: relative;
+  width: var(--scan-frame, min(320px, 85%));
+  aspect-ratio: 1;
+  max-width: 320px;
+  z-index: 1;
+  /* Dim everything outside the frame (clipped by stage overflow) */
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.52);
 }
 
 .scan-reticle__corner {
@@ -981,7 +993,7 @@ html[data-theme='light'] .scan-manual__error {
   margin: 0;
 }
 
-/* Capacitor ML Kit fullscreen camera */
+/* Capacitor ML Kit: camera shows through transparent regions only */
 html.barcode-scanner-active,
 html.barcode-scanner-active body,
 body.barcode-scanner-active {
@@ -990,17 +1002,33 @@ body.barcode-scanner-active {
 
 html.barcode-scanner-active .bottom-nav,
 body.barcode-scanner-active .bottom-nav {
-  display: none;
+  display: flex;
+  z-index: 50;
+  background: var(--brand-surface) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  pointer-events: auto;
 }
 
 html.barcode-scanner-active .app-shell__body,
 body.barcode-scanner-active .app-shell__body {
-  padding-bottom: 0;
+  /* Keep space for the bottom nav so camera never sits under tabs */
+  padding-bottom: calc(var(--bottom-nav-h) + var(--safe-bottom));
 }
 
-html.barcode-scanner-active .page-scan--native-active .app-header,
+html.barcode-scanner-active .app-header,
+body.barcode-scanner-active .app-header {
+  background: var(--brand-surface) !important;
+  position: relative;
+  z-index: 50;
+  pointer-events: auto;
+}
+
+html.barcode-scanner-active .page-scan--native-active .scan-stage--live,
+body.barcode-scanner-active .page-scan--native-active .scan-stage--live {
+  background: transparent;
+}
+
 html.barcode-scanner-active .page-scan--native-active .permission-banner,
-body.barcode-scanner-active .page-scan--native-active .app-header,
 body.barcode-scanner-active .page-scan--native-active .permission-banner {
   background: transparent;
 }
