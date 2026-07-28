@@ -119,12 +119,13 @@ async function verifyWithApi(
   const timer = window.setTimeout(() => controller.abort(), 12000);
 
   try {
+    // Do NOT send custom headers like X-Client-Origin: voyageur241.com CORS
+    // Allow-Headers only lists Content-Type / Authorization (browser would block).
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'X-Client-Origin': appConfig.corsOrigin,
     };
-    if (token) {
+    if (appConfig.authMode === 'jwt' && token) {
       headers.Authorization = `Bearer ${token}`;
     }
 
@@ -144,13 +145,35 @@ async function verifyWithApi(
       };
     }
 
-    if (!res.ok) {
-      return null;
+    let data: TicketVerifyResponse | null = null;
+    try {
+      data = (await res.json()) as TicketVerifyResponse;
+    } catch {
+      data = null;
     }
 
-    return (await res.json()) as TicketVerifyResponse;
-  } catch {
-    return null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: data?.status || 'invalid',
+        message:
+          data?.message ||
+          `Contrôle API échoué (HTTP ${res.status}). Réessayez dans un instant.`,
+        reason: data?.reason,
+        ticket: data?.ticket,
+      };
+    }
+
+    return data;
+  } catch (err) {
+    const aborted = err instanceof DOMException && err.name === 'AbortError';
+    return {
+      ok: false,
+      status: 'invalid',
+      message: aborted
+        ? 'Délai dépassé — l’API voyageur241 ne répond pas.'
+        : 'Contrôle en base impossible (réseau / CORS). Vérifiez la connexion.',
+    };
   } finally {
     window.clearTimeout(timer);
   }
@@ -174,7 +197,7 @@ export async function authenticateTicket(
     return {
       ticket,
       isDuplicate: ticket.status === 'already_scanned',
-      fromApi: true,
+      fromApi: api.ok === true || Boolean(api.ticket),
     };
   }
 
