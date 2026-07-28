@@ -40,7 +40,9 @@ Logique principale dans `footer.php` :
 - [ ] Stage caméra borné (~55–65% hauteur), **pas** plein écran sous la nav
 - [ ] `AppHeader` + `bottom-nav` toujours visibles et cliquables en mode live
 - [ ] Viseur (`.scan-reticle`) + voile hors cadre aligné sur `qrbox` / `--scan-frame`
-- [ ] Sensibilité web : `fps: 20`, `qrbox` ≈ `min(320, min(W,H)*0.85)`
+- [ ] Sensibilité web : `fps: 30`, `qrbox` ≈ 92% du côté min (BarcodeDetector si dispo)
+- [ ] Vidéo en `object-fit: contain` (pas `cover`) pour aligner zone lue / zone vue
+- [ ] Tout QR décodable (même hors ticket) → feedback immédiat + écran résultat
 - [ ] Cooldown 2s conservé
 - [ ] Natif ML Kit : nav opaque (`z-index` élevé), body transparent uniquement hors chrome
 

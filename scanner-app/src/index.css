@@ -512,7 +512,7 @@ a {
 }
 
 .scan-stage--live {
-  --scan-frame: min(320px, 85%);
+  --scan-frame: min(92%, 520px);
   background: #000;
   flex: 1 1 auto;
   min-height: min(58dvh, 480px);
@@ -719,6 +719,7 @@ html[data-theme='light'] .scan-manual__error {
 #web-qr-reader__scan_region {
   width: 100% !important;
   max-width: none !important;
+  height: 100% !important;
 }
 
 #web-qr-reader__dashboard_section,
@@ -728,35 +729,41 @@ html[data-theme='light'] .scan-manual__error {
   display: none !important;
 }
 
+/* Keep library shade invisible — our .scan-reticle provides the guide.
+   Do NOT zero out layout sizes; decoding depends on the scan region box. */
 #qr-shaded-region {
-  border: none !important;
+  border-color: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  background: transparent !important;
 }
 
 #qr-shaded-region > div {
-  display: none !important;
+  background: transparent !important;
+  border: none !important;
 }
 
+/* contain (not cover): decoded region must match what the user sees */
 .web-qr-reader video,
 #web-qr-reader__scan_region video {
   width: 100% !important;
   height: 100% !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
   border-radius: 0 !important;
-  position: absolute !important;
-  inset: 0 !important;
+  background: #000 !important;
 }
 
 #web-qr-reader__scan_region {
-  position: absolute !important;
-  inset: 0 !important;
+  position: relative !important;
+  inset: auto !important;
   min-height: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .web-qr-reader img {
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .scan-live {
@@ -807,12 +814,20 @@ html[data-theme='light'] .scan-manual__error {
 
 .scan-reticle__frame {
   position: relative;
-  width: var(--scan-frame, min(320px, 85%));
+  width: var(--scan-frame, min(92%, 520px));
   aspect-ratio: 1;
-  max-width: 320px;
+  max-width: 520px;
   z-index: 1;
   /* Dim everything outside the frame (clipped by stage overflow) */
   box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.52);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.scan-reticle__frame.is-hit {
+  box-shadow:
+    0 0 0 100vmax rgba(0, 0, 0, 0.45),
+    0 0 0 4px var(--brand-lime);
+  transform: scale(1.02);
 }
 
 .scan-reticle__corner {

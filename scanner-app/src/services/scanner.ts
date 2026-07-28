@@ -4,7 +4,7 @@ import {
   BarcodeFormat,
   type BarcodesScannedEvent,
 } from '@capacitor-mlkit/barcode-scanning';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 export type ScanPermissionState = 'granted' | 'denied' | 'prompt' | 'unsupported';
 
@@ -16,6 +16,14 @@ export type ScannerCallbacks = {
 let webScanner: Html5Qrcode | null = null;
 let nativeListener: { remove: () => Promise<void> } | null = null;
 let cooldownUntil = 0;
+
+/** Shared with CSS --scan-frame so the visual guide matches the decoded region. */
+export function computeQrBoxSize(viewfinderWidth: number, viewfinderHeight: number): number {
+  const minSide = Math.min(viewfinderWidth, viewfinderHeight);
+  if (!Number.isFinite(minSide) || minSide <= 0) return 250;
+  // Large box = higher hit rate for small / distant / busy QR codes
+  return Math.max(120, Math.floor(minSide * 0.92));
+}
 
 export function isInCooldown(): boolean {
   return Date.now() < cooldownUntil;
@@ -175,20 +183,17 @@ async function startWithCamera(
   await scanner.start(
     cameraConfig,
     {
-      // Higher fps + larger box = better detection of small / distant / invalid QR
-      fps: 20,
-      // Keep in sync with CSS --scan-frame (min(320px, 85% of stage))
+      // Higher fps + large box = better detection (incl. non-ticket / "lambda" QR)
+      fps: 30,
       qrbox: (viewfinderWidth, viewfinderHeight) => {
-        const side = Math.floor(
-          Math.min(320, Math.min(viewfinderWidth, viewfinderHeight) * 0.85),
-        );
+        const side = computeQrBoxSize(viewfinderWidth, viewfinderHeight);
         return { width: side, height: side };
       },
-      // Do NOT force square video — that left a black empty half under the feed
-      videoConstraints: typeof cameraConfig === 'string' ? undefined : cameraConfig,
+      aspectRatio: 1.777778,
+      disableFlip: false,
     },
     (decodedText) => {
-      if (isInCooldown()) return;
+      if (!decodedText || isInCooldown()) return;
       triggerCooldown();
       callbacks.onResult(decodedText);
     },
@@ -203,7 +208,13 @@ export async function startWebScan(
   await stopWebScan();
   await waitForElement(elementId);
 
-  webScanner = new Html5Qrcode(elementId, { verbose: false });
+  webScanner = new Html5Qrcode(elementId, {
+    verbose: false,
+    experimentalFeatures: {
+      useBarCodeDetectorIfSupported: true,
+    },
+    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+  });
 
   const attempts: Array<MediaTrackConstraints | string> = [
     { facingMode: { ideal: 'environment' } },
@@ -215,7 +226,8 @@ export async function startWebScan(
   for (const config of attempts) {
     try {
       await startWithCamera(webScanner, config, callbacks);
-      // Ensure inline playback on iOS Safari
+      // Ensure inline playback on iOS Safari — do NOT restyle video with
+      // object-fit:cover (that desyncs the decoded region from what the user sees).
       const video = document.querySelector(
         `#${elementId} video`,
       ) as HTMLVideoElement | null;
@@ -223,6 +235,7 @@ export async function startWebScan(
         video.setAttribute('playsinline', 'true');
         video.setAttribute('webkit-playsinline', 'true');
         video.muted = true;
+        video.style.objectFit = 'contain';
       }
       return;
     } catch (err) {

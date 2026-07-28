@@ -79,6 +79,9 @@ export function ScanPage() {
       if (processingRef.current) return;
       processingRef.current = true;
       setBusy(true);
+      setError('');
+      // Immediate UI pulse so the user sees the QR was read (even if invalid)
+      document.querySelector('.scan-reticle__frame')?.classList.add('is-hit');
       try {
         const { ticket } = await authenticateTicket(raw, agent?.identifier ?? 'agent');
         if (ticket.status === 'valid') {
@@ -97,6 +100,7 @@ export function ScanPage() {
       } finally {
         processingRef.current = false;
         setBusy(false);
+        document.querySelector('.scan-reticle__frame')?.classList.remove('is-hit');
       }
     },
     [navigate, agent?.identifier],
@@ -361,7 +365,8 @@ export function ScanPage() {
                 <p className="scan-live__hint">
                   {phase === 'starting' || busy ? (
                     <>
-                      <IconCamera size={16} /> Ouverture de la caméra…
+                      <IconCamera size={16} />{' '}
+                      {busy ? 'QR détecté — vérification…' : 'Ouverture de la caméra…'}
                     </>
                   ) : (
                     <>
