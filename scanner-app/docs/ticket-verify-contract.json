@@ -72,11 +72,29 @@
     "Si champs divergents → status mismatch + mismatches[]",
     "Sinon → status valid (existe en base, non annulé, non scanné) + ticket canonique",
     "Manifeste : informatif (onManifeste) — n’empêche plus le statut valid",
-    "CORS: Access-Control-Allow-Origin = VITE_CORS_ORIGIN (ou liste d’origines scanner)"
+    "CORS: Access-Control-Allow-Origin = https://scanner-app-gamma.vercel.app",
+    "CORS methods: POST, OPTIONS"
   ],
   "cors_example": {
-    "Access-Control-Allow-Origin": "https://scanner-voyageur241.vercel.app",
+    "Access-Control-Allow-Origin": "https://scanner-app-gamma.vercel.app",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Accept, X-Client-Origin, Authorization"
+  },
+  "channels": {
+    "prod": {
+      "apiBaseUrl": "https://voyageur241.com",
+      "vercel": "https://scanner-app-gamma.vercel.app",
+      "authMode": "agent",
+      "version": "0.2.0-stable",
+      "simulation": false
+    },
+    "lab": {
+      "branch": "lab/railway-simulation",
+      "apiBaseUrl": "https://scanner-api-production-e278.up.railway.app",
+      "authMode": "jwt",
+      "version": "0.2.0-lab",
+      "simulation": true,
+      "deployProduction": false
+    }
   }
 }

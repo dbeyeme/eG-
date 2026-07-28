@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
+import { WebQrScanner } from '../components/WebQrScanner';
 import {
   IconAlert,
   IconCamera,
@@ -17,14 +18,15 @@ import { useAuth } from '../context/AuthContext';
 import {
   cameraBlockedHelp,
   checkCameraPermission,
+  isInCooldown,
   isNativeScannerAvailable,
   isSecureCameraContext,
   openAppSettings,
   requestCameraPermission,
   scanQrFromFile,
   startNativeScan,
-  startWebScan,
   stopAllScanners,
+  triggerCooldown,
   type ScanPermissionState,
 } from '../services/scanner';
 
@@ -79,6 +81,8 @@ export function ScanPage() {
       if (processingRef.current) return;
       processingRef.current = true;
       setBusy(true);
+      setError('');
+      document.querySelector('.scan-reticle__frame')?.classList.add('is-hit');
       try {
         const { ticket } = await authenticateTicket(raw, agent?.identifier ?? 'agent');
         if (ticket.status === 'valid') {
@@ -97,9 +101,19 @@ export function ScanPage() {
       } finally {
         processingRef.current = false;
         setBusy(false);
+        document.querySelector('.scan-reticle__frame')?.classList.remove('is-hit');
       }
     },
     [navigate, agent?.identifier],
+  );
+
+  const onWebScanResult = useCallback(
+    (raw: string) => {
+      if (isInCooldown() || processingRef.current) return;
+      triggerCooldown();
+      void handleRaw(raw);
+    },
+    [handleRaw],
   );
 
   async function verifyManualNumber() {
@@ -113,6 +127,7 @@ export function ScanPage() {
   }
 
   async function enableCamera() {
+    if (phase === 'starting') return;
     const token = ++startTokenRef.current;
     setError('');
 
@@ -125,6 +140,9 @@ export function ScanPage() {
     setPhase('starting');
 
     try {
+      await stopAllScanners();
+      if (token !== startTokenRef.current) return;
+
       if (native) {
         const state = await requestCameraPermission();
         if (token !== startTokenRef.current) return;
@@ -135,15 +153,6 @@ export function ScanPage() {
           return;
         }
         await startNativeScan({
-          onResult: (raw) => void handleRaw(raw),
-          onError: (message) => {
-            if (token !== startTokenRef.current) return;
-            setError(message);
-            setPhase('blocked');
-          },
-        });
-      } else {
-        await startWebScan('web-qr-reader', {
           onResult: (raw) => void handleRaw(raw),
           onError: (message) => {
             if (token !== startTokenRef.current) return;
@@ -205,7 +214,7 @@ export function ScanPage() {
     <div
       className={`page page-scan ${showLive ? 'page-scan--live' : ''} ${showLive && native ? 'page-scan--native-active' : ''}`}
     >
-      {!showLive ? <AppHeader title="Scan QR" /> : null}
+      <AppHeader title="Scan QR" />
 
       {!showLive ? (
         <div className="page-banner" aria-hidden>
@@ -221,10 +230,15 @@ export function ScanPage() {
         <div
           className={`scan-stage ${showLive ? 'scan-stage--live' : ''} ${showBlocked ? 'scan-stage--blocked' : ''}`}
         >
-          {!native ? (
-            <div
-              id="web-qr-reader"
-              className={`web-qr-reader ${showLive ? 'web-qr-reader--visible' : 'web-qr-reader--hidden'}`}
+          {!native && phase === 'live' ? (
+            <WebQrScanner
+              paused={busy}
+              onResult={onWebScanResult}
+              onError={(message) => {
+                setError(message);
+                setPhase('blocked');
+                setPermission(/refus|Permission|denied/i.test(message) ? 'denied' : permission);
+              }}
             />
           ) : null}
 
@@ -349,21 +363,27 @@ export function ScanPage() {
           {showLive ? (
             <div className="scan-live">
               <div className="scan-reticle" aria-hidden>
-                <span className="scan-reticle__corner scan-reticle__corner--tl" />
-                <span className="scan-reticle__corner scan-reticle__corner--tr" />
-                <span className="scan-reticle__corner scan-reticle__corner--bl" />
-                <span className="scan-reticle__corner scan-reticle__corner--br" />
+                <span className="scan-reticle__frame">
+                  <span className="scan-reticle__corner scan-reticle__corner--tl" />
+                  <span className="scan-reticle__corner scan-reticle__corner--tr" />
+                  <span className="scan-reticle__corner scan-reticle__corner--bl" />
+                  <span className="scan-reticle__corner scan-reticle__corner--br" />
+                </span>
               </div>
 
               <div className="scan-live__bar">
                 <p className="scan-live__hint">
-                  {phase === 'starting' || busy ? (
+                  {busy ? (
+                    <>
+                      <IconCamera size={16} /> QR détecté — vérification…
+                    </>
+                  ) : phase === 'starting' ? (
                     <>
                       <IconCamera size={16} /> Ouverture de la caméra…
                     </>
                   ) : (
                     <>
-                      <IconScan size={16} /> Alignez le QR dans le viseur
+                      <IconScan size={16} /> Alignez le QR dans le cadre
                     </>
                   )}
                 </p>

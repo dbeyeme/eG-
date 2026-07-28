@@ -38,9 +38,23 @@ export async function getScannedTickets(): Promise<TicketInfo[]> {
 }
 
 export async function isTicketAlreadyScanned(ticketNumber: string): Promise<boolean> {
+  return Boolean(await getPriorValidatedTicket(ticketNumber));
+}
+
+/** Dernière fiche locale déjà validée / déjà scannée pour ce numéro (hors simulation). */
+export async function getPriorValidatedTicket(
+  ticketNumber: string,
+): Promise<TicketInfo | null> {
+  const normalized = ticketNumber.trim().toUpperCase();
+  if (!normalized || normalized === 'INCONNU') return null;
+
   const tickets = await readAll();
-  return tickets.some(
-    (t) => t.number === ticketNumber && (t.status === 'valid' || t.status === 'already_scanned'),
+  return (
+    tickets.find(
+      (t) =>
+        t.number.trim().toUpperCase() === normalized &&
+        (t.status === 'valid' || t.status === 'already_scanned'),
+    ) ?? null
   );
 }
 

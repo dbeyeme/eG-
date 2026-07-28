@@ -481,22 +481,24 @@ a {
 }
 
 .scan-main--live {
-  max-width: none;
-  padding: 0;
   flex: 1;
+  min-height: 0;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 .page-scan--live {
-  background: #000;
+  background: var(--brand-bg);
   height: 100%;
+  min-height: 0;
 }
 
+/* Keep bottom nav usable while the camera is live */
 .app-shell:has(.page-scan--live) .bottom-nav {
-  display: none;
-}
-
-.app-shell:has(.page-scan--live) .app-shell__body {
-  padding-bottom: 0;
+  display: flex;
+  z-index: 50;
+  background: var(--brand-surface);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .scan-stage {
@@ -510,12 +512,14 @@ a {
 }
 
 .scan-stage--live {
+  --scan-frame: min(92%, 520px);
   background: #000;
-  min-height: 0;
-  height: 100%;
-  flex: 1;
-  border: none;
-  border-radius: 0;
+  flex: 1 1 auto;
+  min-height: min(58dvh, 480px);
+  max-height: min(65dvh, 560px);
+  height: auto;
+  border: 1px solid rgba(200, 255, 0, 0.28);
+  border-radius: var(--radius);
 }
 
 .scan-idle,
@@ -692,6 +696,10 @@ html[data-theme='light'] .scan-manual__error {
 }
 
 .web-qr-reader {
+  display: none;
+}
+
+.react-qr-scanner {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -701,58 +709,10 @@ html[data-theme='light'] .scan-manual__error {
   background: #000;
 }
 
-.web-qr-reader--hidden {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.web-qr-reader--visible {
-  visibility: visible;
-}
-
-.web-qr-reader,
-.web-qr-reader > *,
-#web-qr-reader__scan_region {
-  width: 100% !important;
-  max-width: none !important;
-}
-
-#web-qr-reader__dashboard_section,
-#web-qr-reader__dashboard_section_csr,
-#web-qr-reader__header_message,
-#web-qr-reader__scan_region > img {
-  display: none !important;
-}
-
-#qr-shaded-region {
-  border: none !important;
-  box-shadow: none !important;
-  outline: none !important;
-  background: transparent !important;
-}
-
-#qr-shaded-region > div {
-  display: none !important;
-}
-
-.web-qr-reader video,
-#web-qr-reader__scan_region video {
+.react-qr-scanner video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
-  border-radius: 0 !important;
-  position: absolute !important;
-  inset: 0 !important;
-}
-
-#web-qr-reader__scan_region {
-  position: absolute !important;
-  inset: 0 !important;
-  min-height: 100% !important;
-}
-
-.web-qr-reader img {
-  object-fit: cover;
 }
 
 .scan-live {
@@ -772,8 +732,7 @@ html[data-theme='light'] .scan-manual__error {
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
-  padding: 1.1rem max(1rem, var(--safe-left)) calc(1.1rem + var(--safe-bottom))
-    max(1rem, var(--safe-right));
+  padding: 1.1rem max(1rem, var(--safe-left)) 1.1rem max(1rem, var(--safe-right));
   background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.78) 40%);
   pointer-events: auto;
 }
@@ -794,13 +753,30 @@ html[data-theme='light'] .scan-manual__error {
 
 .scan-reticle {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  translate: -50% -54%;
-  width: min(240px, 68vw);
-  aspect-ratio: 1;
+  inset: 0;
   pointer-events: none;
   z-index: 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.scan-reticle__frame {
+  position: relative;
+  width: var(--scan-frame, min(92%, 520px));
+  aspect-ratio: 1;
+  max-width: 520px;
+  z-index: 1;
+  /* Dim everything outside the frame (clipped by stage overflow) */
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.52);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.scan-reticle__frame.is-hit {
+  box-shadow:
+    0 0 0 100vmax rgba(0, 0, 0, 0.45),
+    0 0 0 4px var(--brand-lime);
+  transform: scale(1.02);
 }
 
 .scan-reticle__corner {
@@ -981,7 +957,7 @@ html[data-theme='light'] .scan-manual__error {
   margin: 0;
 }
 
-/* Capacitor ML Kit fullscreen camera */
+/* Capacitor ML Kit: camera shows through transparent regions only */
 html.barcode-scanner-active,
 html.barcode-scanner-active body,
 body.barcode-scanner-active {
@@ -990,17 +966,33 @@ body.barcode-scanner-active {
 
 html.barcode-scanner-active .bottom-nav,
 body.barcode-scanner-active .bottom-nav {
-  display: none;
+  display: flex;
+  z-index: 50;
+  background: var(--brand-surface) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  pointer-events: auto;
 }
 
 html.barcode-scanner-active .app-shell__body,
 body.barcode-scanner-active .app-shell__body {
-  padding-bottom: 0;
+  /* Keep space for the bottom nav so camera never sits under tabs */
+  padding-bottom: calc(var(--bottom-nav-h) + var(--safe-bottom));
 }
 
-html.barcode-scanner-active .page-scan--native-active .app-header,
+html.barcode-scanner-active .app-header,
+body.barcode-scanner-active .app-header {
+  background: var(--brand-surface) !important;
+  position: relative;
+  z-index: 50;
+  pointer-events: auto;
+}
+
+html.barcode-scanner-active .page-scan--native-active .scan-stage--live,
+body.barcode-scanner-active .page-scan--native-active .scan-stage--live {
+  background: transparent;
+}
+
 html.barcode-scanner-active .page-scan--native-active .permission-banner,
-body.barcode-scanner-active .page-scan--native-active .app-header,
 body.barcode-scanner-active .page-scan--native-active .permission-banner {
   background: transparent;
 }
@@ -1096,6 +1088,39 @@ body.barcode-scanner-active .page-scan--native-active .permission-banner {
   margin: 0.35rem 0 0;
   font-size: 0.75rem;
   color: var(--brand-muted);
+}
+
+.login-hero__channel-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.7rem;
+  color: var(--brand-muted);
+}
+
+.channel-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.channel-badge--prod {
+  background: rgba(88, 214, 141, 0.22);
+  color: #58d68d;
+  border: 1px solid rgba(88, 214, 141, 0.45);
+}
+
+.channel-badge--lab {
+  background: rgba(255, 160, 0, 0.18);
+  color: #ffb347;
+  border: 1px solid rgba(255, 160, 0, 0.4);
+}
+
+.app-header__agent .channel-badge {
+  margin-right: 0.15rem;
 }
 
 /* Light mode */

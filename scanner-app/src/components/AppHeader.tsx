@@ -21,6 +21,10 @@ export function AppHeader({ title }: Props) {
           {title ? <h1 className="app-header__title">{title}</h1> : null}
           {agent ? (
             <p className="app-header__agent">
+              <span className={`channel-badge channel-badge--${appConfig.channel}`}>
+                {appConfig.channel === 'lab' ? 'LAB' : 'PROD'}
+              </span>
+              {' '}
               {agent.identifier} · v{appConfig.version}
             </p>
           ) : null}

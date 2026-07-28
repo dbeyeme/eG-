@@ -4,7 +4,7 @@ import { appConfig, ticketVerifyUrl } from '../config/env';
 import type { TicketVerifyRequest, TicketVerifyResponse } from '../types/api';
 import type { TicketInfo, TicketReason, TicketStatus } from '../types/ticket';
 import { parseTicketPayload } from './ticketParser';
-import { getScannedTickets, saveScannedTicket } from './scanHistory';
+import { getPriorValidatedTicket, getScannedTickets, saveScannedTicket } from './scanHistory';
 
 export type AuthResult = {
   ticket: TicketInfo;
@@ -95,9 +95,10 @@ async function verifyWithApi(
   rawPayload: string,
   local: TicketInfo,
   agentId: string,
-): Promise<TicketVerifyResponse | null> {
+): Promise<TicketVerifyResponse> {
   const token = getAuthToken();
-  if (!token) {
+  // Canal LAB (Railway JWT) : token obligatoire. Canal PROD (voyageur241.com) : sans JWT.
+  if (appConfig.authMode === 'jwt' && !token) {
     return {
       ok: false,
       status: 'invalid',
@@ -115,19 +116,26 @@ async function verifyWithApi(
   };
 
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 12000);
+  const timer = window.setTimeout(() => controller.abort(), 15000);
 
   try {
+    // Minimal headers only — voyageur241.com Allow-Headers is narrow.
+    // Never send X-Client-Origin (CORS preflight would fail).
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (appConfig.authMode === 'jwt' && token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     const res = await fetch(ticketVerifyUrl(), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'X-Client-Origin': appConfig.corsOrigin,
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
+      cache: 'no-store',
+      mode: 'cors',
+      credentials: 'omit',
     });
 
     if (res.status === 401) {
@@ -139,13 +147,46 @@ async function verifyWithApi(
       };
     }
 
-    if (!res.ok) {
-      return null;
+    let data: TicketVerifyResponse | null = null;
+    try {
+      data = (await res.json()) as TicketVerifyResponse;
+    } catch {
+      data = null;
     }
 
-    return (await res.json()) as TicketVerifyResponse;
-  } catch {
-    return null;
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: data?.status || 'invalid',
+        message:
+          data?.message ||
+          `Contrôle API échoué (HTTP ${res.status}). Réessayez dans un instant.`,
+        reason: data?.reason,
+        ticket: data?.ticket,
+      };
+    }
+
+    if (!data || typeof data !== 'object' || !data.status) {
+      return {
+        ok: false,
+        status: 'invalid',
+        message: 'Réponse API invalide ou vide. Réessayez.',
+      };
+    }
+
+    return data;
+  } catch (err) {
+    const aborted = err instanceof DOMException && err.name === 'AbortError';
+    const raw = err instanceof Error ? err.message : String(err ?? '');
+    return {
+      ok: false,
+      status: 'invalid',
+      message: aborted
+        ? 'Délai dépassé — l’API voyageur241 ne répond pas.'
+        : /Failed to fetch|NetworkError|Load failed|CORS/i.test(raw)
+          ? 'Contrôle en base impossible (réseau / CORS). Vérifiez la connexion puis réessayez.'
+          : `Contrôle en base impossible (${raw || 'erreur réseau'}).`,
+    };
   } finally {
     window.clearTimeout(timer);
   }
@@ -162,27 +203,42 @@ export async function authenticateTicket(
     return { ticket: local, isDuplicate: false, fromApi: false };
   }
 
+  const prior = await getPriorValidatedTicket(local.number);
   const api = await verifyWithApi(rawPayload, local, agentId);
-  if (api) {
-    const ticket = mergeTicket(local, api);
-    await saveScannedTicket(ticket);
-    return {
-      ticket,
-      isDuplicate: ticket.status === 'already_scanned',
-      fromApi: true,
+  let ticket = mergeTicket(local, api);
+
+  // L’API prod ne persiste pas encore already_scanned : on refuse un 2e passage
+  // si ce numéro a déjà été validé dans la session (historique local réel).
+  const apiSaysDuplicate =
+    api.status === 'already_scanned' || api.reason === 'already_scanned';
+  const localDuplicate = Boolean(prior) && (ticket.status === 'valid' || apiSaysDuplicate);
+
+  if (apiSaysDuplicate || localDuplicate) {
+    const fiche = api.ticket || prior;
+    ticket = {
+      ...ticket,
+      number: fiche?.number || ticket.number,
+      passengerName: fiche?.passengerName || ticket.passengerName,
+      route: fiche?.route || ticket.route,
+      origin: fiche?.origin || ticket.origin,
+      destination: fiche?.destination || ticket.destination,
+      travelDate: fiche?.travelDate || ticket.travelDate,
+      boardingTime: fiche?.boardingTime || ticket.boardingTime,
+      fare: fiche?.fare || ticket.fare,
+      status: 'already_scanned',
+      reason: 'already_scanned',
+      message: apiSaysDuplicate
+        ? api.message || 'Ticket déjà contrôlé à l’embarquement'
+        : 'Ticket déjà contrôlé à l’embarquement (session)',
     };
   }
 
-  const offline: TicketInfo = {
-    ...local,
-    ...emptyTripFields(),
-    number: local.number,
-    status: 'invalid',
-    message:
-      'Contrôle en base impossible (API indisponible). Aucune validation simulée.',
+  await saveScannedTicket(ticket);
+  return {
+    ticket,
+    isDuplicate: ticket.status === 'already_scanned',
+    fromApi: api.ok === true || Boolean(api.ticket) || apiSaysDuplicate,
   };
-  await saveScannedTicket(offline);
-  return { ticket: offline, isDuplicate: false, fromApi: false };
 }
 
 export async function getHistory(): Promise<TicketInfo[]> {

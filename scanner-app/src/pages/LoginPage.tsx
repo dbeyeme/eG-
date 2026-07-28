@@ -13,15 +13,19 @@ export function LoginPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
   const [loading, setLoading] = useState(false);
+  const needsPassword = appConfig.authMode === 'jwt';
 
   if (agent) return <Navigate to="/scan" replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
-    if (!identifier.trim() || !password.trim()) {
+    if (!identifier.trim()) {
+      setError('Identifiant agent requis.');
+      return;
+    }
+    if (needsPassword && !password.trim()) {
       setError('Identifiant et mot de passe requis.');
       return;
     }
@@ -29,7 +33,11 @@ export function LoginPage() {
     const ok = await login(identifier, password);
     setLoading(false);
     if (!ok) {
-      setError('Identifiants invalides ou API indisponible.');
+      setError(
+        needsPassword
+          ? 'Identifiants invalides ou API indisponible.'
+          : 'Impossible de démarrer la session agent.',
+      );
       return;
     }
     navigate('/scan');
@@ -58,7 +66,14 @@ export function LoginPage() {
           <p className="login-hero__sub">
             Authentifiez les billets voyageur241 en un geste à l&apos;embarquement.
           </p>
-          <p className="login-hero__version">v{appConfig.version}</p>
+          <p className={`login-hero__version channel-badge channel-badge--${appConfig.channel}`}>
+            {appConfig.versionLabel}
+          </p>
+          {appConfig.isLab ? (
+            <p className="login-hero__channel-hint">Mode laboratoire — API Railway / données de test</p>
+          ) : (
+            <p className="login-hero__channel-hint">Production — API voyageur241.com</p>
+          )}
         </div>
 
         <form className="auth-form" onSubmit={onSubmit}>
@@ -72,7 +87,7 @@ export function LoginPage() {
               <IconUser size={18} />
               <input
                 type="text"
-                placeholder="v241 ou Premium-transport"
+                placeholder={needsPassword ? 'v241 ou Premium-transport' : 'Agent_1'}
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 autoComplete="username"
@@ -80,20 +95,22 @@ export function LoginPage() {
               />
             </span>
           </label>
-          <label>
-            Mot de passe
-            <span className="input-with-icon">
-              <IconLock size={18} />
-              <input
-                type="password"
-                placeholder="Mot de passe"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </span>
-          </label>
+          {needsPassword ? (
+            <label>
+              Mot de passe
+              <span className="input-with-icon">
+                <IconLock size={18} />
+                <input
+                  type="password"
+                  placeholder="Mot de passe"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </span>
+            </label>
+          ) : null}
           {error ? <p className="form-error">{error}</p> : null}
           <button type="submit" className="btn btn-primary" disabled={loading}>
             <IconLogin size={18} />

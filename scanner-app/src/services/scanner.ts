@@ -13,7 +13,6 @@ export type ScannerCallbacks = {
   onError?: (message: string) => void;
 };
 
-let webScanner: Html5Qrcode | null = null;
 let nativeListener: { remove: () => Promise<void> } | null = null;
 let cooldownUntil = 0;
 
@@ -44,7 +43,6 @@ export function cameraBlockedHelp(native: boolean): string {
   return 'Autorisez la caméra dans Réglages → Safari → Caméra (ou le dialogue Safari), puis réessayez. Sinon importez une photo du QR.';
 }
 
-
 export async function checkCameraPermission(): Promise<ScanPermissionState> {
   if (!Capacitor.isNativePlatform()) {
     if (!navigator.mediaDevices?.getUserMedia) return 'unsupported';
@@ -63,9 +61,6 @@ export async function checkCameraPermission(): Promise<ScanPermissionState> {
 
 export async function requestCameraPermission(): Promise<ScanPermissionState> {
   if (!Capacitor.isNativePlatform()) {
-    // Do not open a throwaway stream here — it races with html5-qrcode
-    // and can break iOS user-gesture chaining. Permission is requested
-    // when startWebScan calls getUserMedia.
     if (!navigator.mediaDevices?.getUserMedia) return 'unsupported';
     return 'prompt';
   }
@@ -78,47 +73,6 @@ export async function requestCameraPermission(): Promise<ScanPermissionState> {
   } catch {
     return 'denied';
   }
-}
-
-function waitForElement(elementId: string, timeoutMs = 3000): Promise<HTMLElement> {
-  return new Promise((resolve, reject) => {
-    const existing = document.getElementById(elementId);
-    if (existing) {
-      resolve(existing);
-      return;
-    }
-
-    const started = Date.now();
-    const timer = window.setInterval(() => {
-      const el = document.getElementById(elementId);
-      if (el) {
-        window.clearInterval(timer);
-        resolve(el);
-        return;
-      }
-      if (Date.now() - started > timeoutMs) {
-        window.clearInterval(timer);
-        reject(new Error('Zone de scan introuvable. Rechargez la page.'));
-      }
-    }, 16);
-  });
-}
-
-function humanizeCameraError(err: unknown): string {
-  const message = err instanceof Error ? err.message : String(err ?? '');
-  if (/NotAllowed|Permission|denied|NotReadableError/i.test(message)) {
-    return 'Permission caméra refusée. Autorisez l’accès puis réessayez.';
-  }
-  if (/NotFound|DevicesNotFound|Requested device not found/i.test(message)) {
-    return 'Aucune caméra détectée. Branchez une webcam ou importez une image QR.';
-  }
-  if (/secure|https|Only secure origins/i.test(message)) {
-    return 'La caméra exige HTTPS (ou localhost).';
-  }
-  if (/Overconstrained|Constraint/i.test(message)) {
-    return 'Cette caméra ne peut pas être ouverte. Réessayez ou importez une image.';
-  }
-  return message || 'Impossible de démarrer la caméra.';
 }
 
 export async function startNativeScan(callbacks: ScannerCallbacks): Promise<void> {
@@ -167,77 +121,7 @@ export async function stopNativeScan(): Promise<void> {
   }
 }
 
-async function startWithCamera(
-  scanner: Html5Qrcode,
-  cameraConfig: MediaTrackConstraints | string,
-  callbacks: ScannerCallbacks,
-): Promise<void> {
-  await scanner.start(
-    cameraConfig,
-    {
-      fps: 10,
-      // Dynamic box; visual overlay is ours (library shade is hidden in CSS)
-      qrbox: (viewfinderWidth, viewfinderHeight) => {
-        const side = Math.floor(
-          Math.min(280, viewfinderWidth * 0.72, viewfinderHeight * 0.55),
-        );
-        return { width: side, height: side };
-      },
-      // Do NOT force square video — that left a black empty half under the feed
-      videoConstraints: typeof cameraConfig === 'string' ? undefined : cameraConfig,
-    },
-    (decodedText) => {
-      if (isInCooldown()) return;
-      triggerCooldown();
-      callbacks.onResult(decodedText);
-    },
-    () => undefined,
-  );
-}
-
-export async function startWebScan(
-  elementId: string,
-  callbacks: ScannerCallbacks,
-): Promise<void> {
-  await stopWebScan();
-  await waitForElement(elementId);
-
-  webScanner = new Html5Qrcode(elementId, { verbose: false });
-
-  const attempts: Array<MediaTrackConstraints | string> = [
-    { facingMode: { ideal: 'environment' } },
-    { facingMode: 'environment' },
-    { facingMode: 'user' },
-  ];
-
-  let lastError: unknown;
-  for (const config of attempts) {
-    try {
-      await startWithCamera(webScanner, config, callbacks);
-      // Ensure inline playback on iOS Safari
-      const video = document.querySelector(
-        `#${elementId} video`,
-      ) as HTMLVideoElement | null;
-      if (video) {
-        video.setAttribute('playsinline', 'true');
-        video.setAttribute('webkit-playsinline', 'true');
-        video.muted = true;
-      }
-      return;
-    } catch (err) {
-      lastError = err;
-      try {
-        if (webScanner.isScanning) await webScanner.stop();
-      } catch {
-        // ignore
-      }
-    }
-  }
-
-  webScanner = null;
-  throw new Error(humanizeCameraError(lastError));
-}
-
+/** File/photo QR decode (fallback when camera is blocked). */
 export async function scanQrFromFile(file: File): Promise<string> {
   const tempId = 'web-qr-file-reader';
   let holder = document.getElementById(tempId);
@@ -260,19 +144,6 @@ export async function scanQrFromFile(file: File): Promise<string> {
   }
 }
 
-export async function stopWebScan(): Promise<void> {
-  if (!webScanner) return;
-  try {
-    if (webScanner.isScanning) {
-      await webScanner.stop();
-    }
-    webScanner.clear();
-  } catch {
-    // ignore
-  }
-  webScanner = null;
-}
-
 export async function openAppSettings(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
@@ -284,5 +155,4 @@ export async function openAppSettings(): Promise<void> {
 
 export async function stopAllScanners(): Promise<void> {
   await stopNativeScan();
-  await stopWebScan();
 }
