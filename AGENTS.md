@@ -40,8 +40,18 @@ Inclure toujours `header.php` / `footer.php`. Scripts communs et logique scan QR
 | `voyageur-ui` | SCSS, layout mobile, composants |
 | `voyageur-scanner` | QR, localStorage, feedback audio |
 | `voyageur-reviewer` | Review sécurité / UX / régression |
+| `voyageur-production` | Prod Vercel scanner → voyageur241.com (sans simulation) |
 
-Délégation : orchestrateur → sous-agents via `delegate_task` ou kanban. Skills : `voyageur-php-pages`, `voyageur-qr-scanner`, `voyageur-mobile-ui`.
+Délégation : orchestrateur → sous-agents via `delegate_task` ou kanban. Skills : `voyageur-php-pages`, `voyageur-qr-scanner`, `voyageur-mobile-ui`, `voyageur-production`.
+
+### Canaux scanner (PROD vs LAB)
+
+| Canal | Branche | API | Prod Vercel ? |
+|-------|---------|-----|---------------|
+| PROD `0.2.0-stable` | `main` | voyageur241.com | **Oui** |
+| LAB `0.2.0-lab` | `lab/railway-simulation` | Railway + fixtures | **Non** |
+
+Détail : `scanner-app/VERSIONS.md`.
 
 ## Ne pas faire
 

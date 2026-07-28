@@ -1098,6 +1098,39 @@ body.barcode-scanner-active .page-scan--native-active .permission-banner {
   color: var(--brand-muted);
 }
 
+.login-hero__channel-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.7rem;
+  color: var(--brand-muted);
+}
+
+.channel-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.channel-badge--prod {
+  background: rgba(88, 214, 141, 0.22);
+  color: #58d68d;
+  border: 1px solid rgba(88, 214, 141, 0.45);
+}
+
+.channel-badge--lab {
+  background: rgba(255, 160, 0, 0.18);
+  color: #ffb347;
+  border: 1px solid rgba(255, 160, 0, 0.4);
+}
+
+.app-header__agent .channel-badge {
+  margin-right: 0.15rem;
+}
+
 /* Light mode */
 html[data-theme='light'] {
   --brand-bg: #f3f5f0;

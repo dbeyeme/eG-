@@ -97,7 +97,8 @@ async function verifyWithApi(
   agentId: string,
 ): Promise<TicketVerifyResponse | null> {
   const token = getAuthToken();
-  if (!token) {
+  // Canal LAB (Railway JWT) : token obligatoire. Canal PROD (voyageur241.com) : sans JWT.
+  if (appConfig.authMode === 'jwt' && !token) {
     return {
       ok: false,
       status: 'invalid',
@@ -118,14 +119,18 @@ async function verifyWithApi(
   const timer = window.setTimeout(() => controller.abort(), 12000);
 
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'X-Client-Origin': appConfig.corsOrigin,
+    };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     const res = await fetch(ticketVerifyUrl(), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'X-Client-Origin': appConfig.corsOrigin,
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
