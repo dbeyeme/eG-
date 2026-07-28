@@ -4,7 +4,7 @@ import { appConfig, ticketVerifyUrl } from '../config/env';
 import type { TicketVerifyRequest, TicketVerifyResponse } from '../types/api';
 import type { TicketInfo, TicketReason, TicketStatus } from '../types/ticket';
 import { parseTicketPayload } from './ticketParser';
-import { getScannedTickets, saveScannedTicket } from './scanHistory';
+import { getPriorValidatedTicket, getScannedTickets, saveScannedTicket } from './scanHistory';
 
 export type AuthResult = {
   ticket: TicketInfo;
@@ -203,13 +203,41 @@ export async function authenticateTicket(
     return { ticket: local, isDuplicate: false, fromApi: false };
   }
 
+  const prior = await getPriorValidatedTicket(local.number);
   const api = await verifyWithApi(rawPayload, local, agentId);
-  const ticket = mergeTicket(local, api);
+  let ticket = mergeTicket(local, api);
+
+  // L’API prod ne persiste pas encore already_scanned : on refuse un 2e passage
+  // si ce numéro a déjà été validé dans la session (historique local réel).
+  const apiSaysDuplicate =
+    api.status === 'already_scanned' || api.reason === 'already_scanned';
+  const localDuplicate = Boolean(prior) && (ticket.status === 'valid' || apiSaysDuplicate);
+
+  if (apiSaysDuplicate || localDuplicate) {
+    const fiche = api.ticket || prior;
+    ticket = {
+      ...ticket,
+      number: fiche?.number || ticket.number,
+      passengerName: fiche?.passengerName || ticket.passengerName,
+      route: fiche?.route || ticket.route,
+      origin: fiche?.origin || ticket.origin,
+      destination: fiche?.destination || ticket.destination,
+      travelDate: fiche?.travelDate || ticket.travelDate,
+      boardingTime: fiche?.boardingTime || ticket.boardingTime,
+      fare: fiche?.fare || ticket.fare,
+      status: 'already_scanned',
+      reason: 'already_scanned',
+      message: apiSaysDuplicate
+        ? api.message || 'Ticket déjà contrôlé à l’embarquement'
+        : 'Ticket déjà contrôlé à l’embarquement (session)',
+    };
+  }
+
   await saveScannedTicket(ticket);
   return {
     ticket,
     isDuplicate: ticket.status === 'already_scanned',
-    fromApi: api.ok === true || Boolean(api.ticket),
+    fromApi: api.ok === true || Boolean(api.ticket) || apiSaysDuplicate,
   };
 }
 

@@ -20,11 +20,13 @@ const STATUS_LABEL: Record<TicketStatus, string> = {
 
 function statusLabel(ticket: TicketInfo): string {
   if (ticket.status === 'valid') return 'Ticket vérifié en base';
+  if (ticket.status === 'already_scanned' || ticket.reason === 'already_scanned') {
+    return 'Déjà contrôlé — embarquement refusé';
+  }
   if (ticket.reason === 'unknown_qr') return 'QR hors Voyageur241';
   if (ticket.reason === 'wrong_agence') return 'Hors agence';
   if (ticket.reason === 'deleted') return 'Ticket annulé';
   if (ticket.reason === 'not_found') return 'Ticket introuvable';
-  if (ticket.reason === 'already_scanned') return 'Déjà scanné';
   if (ticket.reason === 'not_on_manifeste') return 'Hors manifeste';
   return STATUS_LABEL[ticket.status];
 }
