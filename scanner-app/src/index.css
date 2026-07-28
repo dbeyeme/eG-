@@ -696,6 +696,10 @@ html[data-theme='light'] .scan-manual__error {
 }
 
 .web-qr-reader {
+  display: none;
+}
+
+.react-qr-scanner {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -705,65 +709,10 @@ html[data-theme='light'] .scan-manual__error {
   background: #000;
 }
 
-.web-qr-reader--hidden {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.web-qr-reader--visible {
-  visibility: visible;
-}
-
-.web-qr-reader,
-.web-qr-reader > *,
-#web-qr-reader__scan_region {
-  width: 100% !important;
-  max-width: none !important;
-  height: 100% !important;
-}
-
-#web-qr-reader__dashboard_section,
-#web-qr-reader__dashboard_section_csr,
-#web-qr-reader__header_message,
-#web-qr-reader__scan_region > img {
-  display: none !important;
-}
-
-/* Keep library shade invisible — our .scan-reticle provides the guide.
-   Do NOT zero out layout sizes; decoding depends on the scan region box. */
-#qr-shaded-region {
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-#qr-shaded-region > div {
-  background: transparent !important;
-  border: none !important;
-}
-
-/* contain (not cover): decoded region must match what the user sees */
-.web-qr-reader video,
-#web-qr-reader__scan_region video {
+.react-qr-scanner video {
   width: 100% !important;
   height: 100% !important;
-  object-fit: contain !important;
-  border-radius: 0 !important;
-  background: #000 !important;
-}
-
-#web-qr-reader__scan_region {
-  position: relative !important;
-  inset: auto !important;
-  min-height: 100% !important;
-  height: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.web-qr-reader img {
-  object-fit: contain;
+  object-fit: cover !important;
 }
 
 .scan-live {

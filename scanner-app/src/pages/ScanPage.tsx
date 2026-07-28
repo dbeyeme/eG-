@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
+import { WebQrScanner } from '../components/WebQrScanner';
 import {
   IconAlert,
   IconCamera,
@@ -17,14 +18,15 @@ import { useAuth } from '../context/AuthContext';
 import {
   cameraBlockedHelp,
   checkCameraPermission,
+  isInCooldown,
   isNativeScannerAvailable,
   isSecureCameraContext,
   openAppSettings,
   requestCameraPermission,
   scanQrFromFile,
   startNativeScan,
-  startWebScan,
   stopAllScanners,
+  triggerCooldown,
   type ScanPermissionState,
 } from '../services/scanner';
 
@@ -80,7 +82,6 @@ export function ScanPage() {
       processingRef.current = true;
       setBusy(true);
       setError('');
-      // Immediate UI pulse so the user sees the QR was read (even if invalid)
       document.querySelector('.scan-reticle__frame')?.classList.add('is-hit');
       try {
         const { ticket } = await authenticateTicket(raw, agent?.identifier ?? 'agent');
@@ -104,6 +105,15 @@ export function ScanPage() {
       }
     },
     [navigate, agent?.identifier],
+  );
+
+  const onWebScanResult = useCallback(
+    (raw: string) => {
+      if (isInCooldown() || processingRef.current) return;
+      triggerCooldown();
+      void handleRaw(raw);
+    },
+    [handleRaw],
   );
 
   async function verifyManualNumber() {
@@ -130,7 +140,6 @@ export function ScanPage() {
     setPhase('starting');
 
     try {
-      // Ensure any previous instance fully settled before a new start (iOS race).
       await stopAllScanners();
       if (token !== startTokenRef.current) return;
 
@@ -144,15 +153,6 @@ export function ScanPage() {
           return;
         }
         await startNativeScan({
-          onResult: (raw) => void handleRaw(raw),
-          onError: (message) => {
-            if (token !== startTokenRef.current) return;
-            setError(message);
-            setPhase('blocked');
-          },
-        });
-      } else {
-        await startWebScan('web-qr-reader', {
           onResult: (raw) => void handleRaw(raw),
           onError: (message) => {
             if (token !== startTokenRef.current) return;
@@ -230,10 +230,15 @@ export function ScanPage() {
         <div
           className={`scan-stage ${showLive ? 'scan-stage--live' : ''} ${showBlocked ? 'scan-stage--blocked' : ''}`}
         >
-          {!native ? (
-            <div
-              id="web-qr-reader"
-              className={`web-qr-reader ${showLive ? 'web-qr-reader--visible' : 'web-qr-reader--hidden'}`}
+          {!native && phase === 'live' ? (
+            <WebQrScanner
+              paused={busy}
+              onResult={onWebScanResult}
+              onError={(message) => {
+                setError(message);
+                setPhase('blocked');
+                setPermission(/refus|Permission|denied/i.test(message) ? 'denied' : permission);
+              }}
             />
           ) : null}
 
@@ -368,10 +373,13 @@ export function ScanPage() {
 
               <div className="scan-live__bar">
                 <p className="scan-live__hint">
-                  {phase === 'starting' || busy ? (
+                  {busy ? (
                     <>
-                      <IconCamera size={16} />{' '}
-                      {busy ? 'QR détecté — vérification…' : 'Ouverture de la caméra…'}
+                      <IconCamera size={16} /> QR détecté — vérification…
+                    </>
+                  ) : phase === 'starting' ? (
+                    <>
+                      <IconCamera size={16} /> Ouverture de la caméra…
                     </>
                   ) : (
                     <>

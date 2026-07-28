@@ -4,11 +4,7 @@ import {
   BarcodeFormat,
   type BarcodesScannedEvent,
 } from '@capacitor-mlkit/barcode-scanning';
-import {
-  Html5Qrcode,
-  Html5QrcodeScannerState,
-  Html5QrcodeSupportedFormats,
-} from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 
 export type ScanPermissionState = 'granted' | 'denied' | 'prompt' | 'unsupported';
 
@@ -17,35 +13,8 @@ export type ScannerCallbacks = {
   onError?: (message: string) => void;
 };
 
-let webScanner: Html5Qrcode | null = null;
 let nativeListener: { remove: () => Promise<void> } | null = null;
 let cooldownUntil = 0;
-
-/** Serialize all html5-qrcode start/stop calls — overlapping transitions throw on iOS. */
-let webOpQueue: Promise<void> = Promise.resolve();
-
-function enqueueWebOp<T>(op: () => Promise<T>): Promise<T> {
-  const run = webOpQueue.then(op, op);
-  webOpQueue = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
-/** Shared with CSS --scan-frame so the visual guide matches the decoded region. */
-export function computeQrBoxSize(viewfinderWidth: number, viewfinderHeight: number): number {
-  const minSide = Math.min(viewfinderWidth, viewfinderHeight);
-  if (!Number.isFinite(minSide) || minSide <= 0) return 250;
-  // Large box = higher hit rate for small / distant / busy QR codes
-  return Math.max(120, Math.floor(minSide * 0.92));
-}
 
 export function isInCooldown(): boolean {
   return Date.now() < cooldownUntil;
@@ -92,9 +61,6 @@ export async function checkCameraPermission(): Promise<ScanPermissionState> {
 
 export async function requestCameraPermission(): Promise<ScanPermissionState> {
   if (!Capacitor.isNativePlatform()) {
-    // Do not open a throwaway stream here — it races with html5-qrcode
-    // and can break iOS user-gesture chaining. Permission is requested
-    // when startWebScan calls getUserMedia.
     if (!navigator.mediaDevices?.getUserMedia) return 'unsupported';
     return 'prompt';
   }
@@ -106,77 +72,6 @@ export async function requestCameraPermission(): Promise<ScanPermissionState> {
     return 'prompt';
   } catch {
     return 'denied';
-  }
-}
-
-function waitForElement(elementId: string, timeoutMs = 3000): Promise<HTMLElement> {
-  return new Promise((resolve, reject) => {
-    const existing = document.getElementById(elementId);
-    if (existing) {
-      resolve(existing);
-      return;
-    }
-
-    const started = Date.now();
-    const timer = window.setInterval(() => {
-      const el = document.getElementById(elementId);
-      if (el) {
-        window.clearInterval(timer);
-        resolve(el);
-        return;
-      }
-      if (Date.now() - started > timeoutMs) {
-        window.clearInterval(timer);
-        reject(new Error('Zone de scan introuvable. Rechargez la page.'));
-      }
-    }, 16);
-  });
-}
-
-function humanizeCameraError(err: unknown): string {
-  const message = err instanceof Error ? err.message : String(err ?? '');
-  if (/already under transition/i.test(message)) {
-    return 'La caméra est encore en cours d’ouverture. Attendez une seconde puis réessayez.';
-  }
-  if (/NotAllowed|Permission|denied|NotReadableError/i.test(message)) {
-    return 'Permission caméra refusée. Autorisez l’accès puis réessayez.';
-  }
-  if (/NotFound|DevicesNotFound|Requested device not found/i.test(message)) {
-    return 'Aucune caméra détectée. Branchez une webcam ou importez une image QR.';
-  }
-  if (/secure|https|Only secure origins/i.test(message)) {
-    return 'La caméra exige HTTPS (ou localhost).';
-  }
-  if (/Overconstrained|Constraint/i.test(message)) {
-    return 'Cette caméra ne peut pas être ouverte. Réessayez ou importez une image.';
-  }
-  return message || 'Impossible de démarrer la caméra.';
-}
-
-async function safeStopInstance(scanner: Html5Qrcode | null): Promise<void> {
-  if (!scanner) return;
-
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    try {
-      const state = scanner.getState();
-      if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
-        await scanner.stop();
-      }
-      break;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err ?? '');
-      if (/already under transition/i.test(msg)) {
-        await delay(180 + attempt * 120);
-        continue;
-      }
-      break;
-    }
-  }
-
-  try {
-    scanner.clear();
-  } catch {
-    // ignore
   }
 }
 
@@ -226,125 +121,7 @@ export async function stopNativeScan(): Promise<void> {
   }
 }
 
-async function pickCameraId(): Promise<string | MediaTrackConstraints> {
-  try {
-    const cameras = await Html5Qrcode.getCameras();
-    if (cameras.length) {
-      const back =
-        cameras.find((c) => /back|arrière|rear|environment|world/i.test(c.label)) ||
-        cameras[cameras.length - 1];
-      return back.id;
-    }
-  } catch {
-    // Permission prompt may happen on start() instead.
-  }
-  return { facingMode: { ideal: 'environment' } };
-}
-
-async function startWithCamera(
-  scanner: Html5Qrcode,
-  cameraConfig: MediaTrackConstraints | string,
-  callbacks: ScannerCallbacks,
-): Promise<void> {
-  await scanner.start(
-    cameraConfig,
-    {
-      // Higher fps + large box = better detection (incl. non-ticket / "lambda" QR)
-      fps: 30,
-      qrbox: (viewfinderWidth, viewfinderHeight) => {
-        const side = computeQrBoxSize(viewfinderWidth, viewfinderHeight);
-        return { width: side, height: side };
-      },
-      // Avoid fixed aspectRatio — it triggers flaky transitions on iPhone Safari.
-      disableFlip: false,
-    },
-    (decodedText) => {
-      if (!decodedText || isInCooldown()) return;
-      triggerCooldown();
-      callbacks.onResult(decodedText);
-    },
-    () => undefined,
-  );
-}
-
-function tuneVideoElement(elementId: string): void {
-  const video = document.querySelector(`#${elementId} video`) as HTMLVideoElement | null;
-  if (!video) return;
-  video.setAttribute('playsinline', 'true');
-  video.setAttribute('webkit-playsinline', 'true');
-  video.muted = true;
-  video.style.objectFit = 'contain';
-}
-
-export async function startWebScan(
-  elementId: string,
-  callbacks: ScannerCallbacks,
-): Promise<void> {
-  return enqueueWebOp(async () => {
-    await safeStopInstance(webScanner);
-    webScanner = null;
-
-    const holder = await waitForElement(elementId);
-    // Wipe leftover library DOM from a previous aborted start.
-    holder.innerHTML = '';
-
-    let scanner = new Html5Qrcode(elementId, {
-      verbose: false,
-      experimentalFeatures: {
-        useBarCodeDetectorIfSupported: true,
-      },
-      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-    });
-    webScanner = scanner;
-
-    const primary = await pickCameraId();
-    const attempts: Array<MediaTrackConstraints | string> = [
-      primary,
-      { facingMode: 'environment' },
-      { facingMode: 'user' },
-    ];
-
-    // Deduplicate identical configs
-    const seen = new Set<string>();
-    const uniqueAttempts = attempts.filter((cfg) => {
-      const key = typeof cfg === 'string' ? `id:${cfg}` : JSON.stringify(cfg);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    let lastError: unknown;
-    for (let i = 0; i < uniqueAttempts.length; i += 1) {
-      const config = uniqueAttempts[i];
-      try {
-        await startWithCamera(scanner, config, callbacks);
-        tuneVideoElement(elementId);
-        return;
-      } catch (err) {
-        lastError = err;
-        await safeStopInstance(scanner);
-        webScanner = null;
-        // Recreate instance after a failed/partial start (required after clear()).
-        if (i < uniqueAttempts.length - 1) {
-          await delay(250);
-          holder.innerHTML = '';
-          scanner = new Html5Qrcode(elementId, {
-            verbose: false,
-            experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true,
-            },
-            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-          });
-          webScanner = scanner;
-        }
-      }
-    }
-
-    webScanner = null;
-    throw new Error(humanizeCameraError(lastError));
-  });
-}
-
+/** File/photo QR decode (fallback when camera is blocked). */
 export async function scanQrFromFile(file: File): Promise<string> {
   const tempId = 'web-qr-file-reader';
   let holder = document.getElementById(tempId);
@@ -367,14 +144,6 @@ export async function scanQrFromFile(file: File): Promise<string> {
   }
 }
 
-export async function stopWebScan(): Promise<void> {
-  return enqueueWebOp(async () => {
-    const scanner = webScanner;
-    webScanner = null;
-    await safeStopInstance(scanner);
-  });
-}
-
 export async function openAppSettings(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
@@ -386,5 +155,4 @@ export async function openAppSettings(): Promise<void> {
 
 export async function stopAllScanners(): Promise<void> {
   await stopNativeScan();
-  await stopWebScan();
 }

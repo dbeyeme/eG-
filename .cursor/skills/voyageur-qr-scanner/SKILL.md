@@ -22,7 +22,8 @@ Logique principale dans `footer.php` :
 ### scanner-app (React / Capacitor)
 
 - UI : `scanner-app/src/pages/ScanPage.tsx`
-- Moteur : `scanner-app/src/services/scanner.ts` (web `Html5Qrcode`, natif ML Kit)
+- Scan web React : `scanner-app/src/components/WebQrScanner.tsx` (`@yudiel/react-qr-scanner`)
+- Moteur natif : `scanner-app/src/services/scanner.ts` (Capacitor ML Kit)
 - Auth ticket : `scanner-app/src/services/ticketAuth.ts`
 - Historique : `scanner-app/src/services/scanHistory.ts`
 - Styles viseur / nav : `scanner-app/src/index.css`
@@ -37,14 +38,13 @@ Logique principale dans `footer.php` :
 
 ## Express UX checklist (scanner-app)
 
-- [ ] Stage caméra borné (~55–65% hauteur), **pas** plein écran sous la nav
-- [ ] `AppHeader` + `bottom-nav` toujours visibles et cliquables en mode live
-- [ ] Viseur (`.scan-reticle`) + voile hors cadre aligné sur `qrbox` / `--scan-frame`
-- [ ] Sensibilité web : `fps: 30`, `qrbox` ≈ 92% du côté min (BarcodeDetector si dispo)
-- [ ] Vidéo en `object-fit: contain` (pas `cover`) pour aligner zone lue / zone vue
-- [ ] Tout QR décodable (même hors ticket) → feedback immédiat + écran résultat
+- [ ] Scan web via `@yudiel/react-qr-scanner` (plugin React BarcodeDetector/ZXing)
+- [ ] Stage caméra borné + `AppHeader` / `bottom-nav` visibles en live
+- [ ] Viseur custom (`.scan-reticle`) au-dessus du flux caméra
+- [ ] Tout QR décodable (même hors ticket / faible contraste) → feedback + résultat
 - [ ] Cooldown 2s conservé
-- [ ] Natif ML Kit : nav opaque (`z-index` élevé), body transparent uniquement hors chrome
+- [ ] Natif ML Kit : nav opaque, body transparent hors chrome
+- [ ] Arrêt caméra = demount React Scanner / stop ML Kit
 
 ## Checklist générale
 
