@@ -28,9 +28,14 @@ function loadAgent(): Agent | null {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const agent = JSON.parse(raw) as Agent;
-    const token = sessionStorage.getItem(TOKEN_KEY) || agent.token;
-    if (!token) return null;
-    return { ...agent, token };
+    if (appConfig.authMode === 'jwt') {
+      const token = sessionStorage.getItem(TOKEN_KEY) || agent.token;
+      if (!token) return null;
+      return { ...agent, token };
+    }
+    // Mode prod (agent) : session locale sans JWT voyageur241.com
+    if (!agent.identifier) return null;
+    return agent;
   } catch {
     return null;
   }
@@ -50,6 +55,56 @@ export function clearAuthSession(): void {
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
+async function loginJwt(identifier: string, password: string): Promise<Agent | null> {
+  const res = await fetch(loginUrl(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      username: identifier.trim(),
+      password,
+    }),
+  });
+
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    ok?: boolean;
+    token?: string;
+    user?: {
+      username: string;
+      displayName?: string;
+      role?: AgentRole;
+      agenceId?: string | null;
+      agenceCode?: string | null;
+      agentId?: string;
+    };
+  };
+
+  if (!data.ok || !data.user || !data.token) return null;
+
+  return {
+    identifier: data.user.agentId || data.user.username,
+    displayName: data.user.displayName,
+    role: data.user.role,
+    agenceId: data.user.agenceId,
+    agenceCode: data.user.agenceCode,
+    token: data.token,
+  };
+}
+
+/** Connexion agent locale pour prod voyageur241.com (contrat agentId). */
+function loginAgentLocal(identifier: string): Agent | null {
+  const id = identifier.trim();
+  if (!id) return null;
+  return {
+    identifier: id,
+    displayName: id,
+    role: 'agent',
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [agent, setAgent] = useState<Agent | null>(() => loadAgent());
 
@@ -57,47 +112,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       agent,
       login: async (identifier, password) => {
-        if (!identifier.trim() || !password.trim()) return false;
+        if (!identifier.trim()) return false;
 
         try {
-          const res = await fetch(loginUrl(), {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-            body: JSON.stringify({
-              username: identifier.trim(),
-              password,
-            }),
-          });
+          let next: Agent | null = null;
 
-          if (!res.ok) return false;
-          const data = (await res.json()) as {
-            ok?: boolean;
-            token?: string;
-            user?: {
-              username: string;
-              displayName?: string;
-              role?: AgentRole;
-              agenceId?: string | null;
-              agenceCode?: string | null;
-              agentId?: string;
-            };
-          };
+          if (appConfig.authMode === 'jwt') {
+            if (!password.trim()) return false;
+            next = await loginJwt(identifier, password);
+            if (!next?.token) return false;
+            sessionStorage.setItem(TOKEN_KEY, next.token);
+          } else {
+            next = loginAgentLocal(identifier);
+            if (!next) return false;
+            sessionStorage.removeItem(TOKEN_KEY);
+          }
 
-          if (!data.ok || !data.user || !data.token) return false;
-
-          const next: Agent = {
-            identifier: data.user.agentId || data.user.username,
-            displayName: data.user.displayName,
-            role: data.user.role,
-            agenceId: data.user.agenceId,
-            agenceCode: data.user.agenceCode,
-            token: data.token,
-          };
           sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
-          sessionStorage.setItem(TOKEN_KEY, data.token);
           setAgent(next);
           return true;
         } catch {
