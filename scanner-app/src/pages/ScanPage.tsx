@@ -117,6 +117,7 @@ export function ScanPage() {
   }
 
   async function enableCamera() {
+    if (phase === 'starting') return;
     const token = ++startTokenRef.current;
     setError('');
 
@@ -129,6 +130,10 @@ export function ScanPage() {
     setPhase('starting');
 
     try {
+      // Ensure any previous instance fully settled before a new start (iOS race).
+      await stopAllScanners();
+      if (token !== startTokenRef.current) return;
+
       if (native) {
         const state = await requestCameraPermission();
         if (token !== startTokenRef.current) return;

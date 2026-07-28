@@ -4,7 +4,11 @@ import {
   BarcodeFormat,
   type BarcodesScannedEvent,
 } from '@capacitor-mlkit/barcode-scanning';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import {
+  Html5Qrcode,
+  Html5QrcodeScannerState,
+  Html5QrcodeSupportedFormats,
+} from 'html5-qrcode';
 
 export type ScanPermissionState = 'granted' | 'denied' | 'prompt' | 'unsupported';
 
@@ -16,6 +20,24 @@ export type ScannerCallbacks = {
 let webScanner: Html5Qrcode | null = null;
 let nativeListener: { remove: () => Promise<void> } | null = null;
 let cooldownUntil = 0;
+
+/** Serialize all html5-qrcode start/stop calls — overlapping transitions throw on iOS. */
+let webOpQueue: Promise<void> = Promise.resolve();
+
+function enqueueWebOp<T>(op: () => Promise<T>): Promise<T> {
+  const run = webOpQueue.then(op, op);
+  webOpQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
 
 /** Shared with CSS --scan-frame so the visual guide matches the decoded region. */
 export function computeQrBoxSize(viewfinderWidth: number, viewfinderHeight: number): number {
@@ -51,7 +73,6 @@ export function cameraBlockedHelp(native: boolean): string {
   }
   return 'Autorisez la caméra dans Réglages → Safari → Caméra (ou le dialogue Safari), puis réessayez. Sinon importez une photo du QR.';
 }
-
 
 export async function checkCameraPermission(): Promise<ScanPermissionState> {
   if (!Capacitor.isNativePlatform()) {
@@ -114,6 +135,9 @@ function waitForElement(elementId: string, timeoutMs = 3000): Promise<HTMLElemen
 
 function humanizeCameraError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err ?? '');
+  if (/already under transition/i.test(message)) {
+    return 'La caméra est encore en cours d’ouverture. Attendez une seconde puis réessayez.';
+  }
   if (/NotAllowed|Permission|denied|NotReadableError/i.test(message)) {
     return 'Permission caméra refusée. Autorisez l’accès puis réessayez.';
   }
@@ -127,6 +151,33 @@ function humanizeCameraError(err: unknown): string {
     return 'Cette caméra ne peut pas être ouverte. Réessayez ou importez une image.';
   }
   return message || 'Impossible de démarrer la caméra.';
+}
+
+async function safeStopInstance(scanner: Html5Qrcode | null): Promise<void> {
+  if (!scanner) return;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const state = scanner.getState();
+      if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+        await scanner.stop();
+      }
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      if (/already under transition/i.test(msg)) {
+        await delay(180 + attempt * 120);
+        continue;
+      }
+      break;
+    }
+  }
+
+  try {
+    scanner.clear();
+  } catch {
+    // ignore
+  }
 }
 
 export async function startNativeScan(callbacks: ScannerCallbacks): Promise<void> {
@@ -175,6 +226,21 @@ export async function stopNativeScan(): Promise<void> {
   }
 }
 
+async function pickCameraId(): Promise<string | MediaTrackConstraints> {
+  try {
+    const cameras = await Html5Qrcode.getCameras();
+    if (cameras.length) {
+      const back =
+        cameras.find((c) => /back|arrière|rear|environment|world/i.test(c.label)) ||
+        cameras[cameras.length - 1];
+      return back.id;
+    }
+  } catch {
+    // Permission prompt may happen on start() instead.
+  }
+  return { facingMode: { ideal: 'environment' } };
+}
+
 async function startWithCamera(
   scanner: Html5Qrcode,
   cameraConfig: MediaTrackConstraints | string,
@@ -189,7 +255,7 @@ async function startWithCamera(
         const side = computeQrBoxSize(viewfinderWidth, viewfinderHeight);
         return { width: side, height: side };
       },
-      aspectRatio: 1.777778,
+      // Avoid fixed aspectRatio — it triggers flaky transitions on iPhone Safari.
       disableFlip: false,
     },
     (decodedText) => {
@@ -201,55 +267,82 @@ async function startWithCamera(
   );
 }
 
+function tuneVideoElement(elementId: string): void {
+  const video = document.querySelector(`#${elementId} video`) as HTMLVideoElement | null;
+  if (!video) return;
+  video.setAttribute('playsinline', 'true');
+  video.setAttribute('webkit-playsinline', 'true');
+  video.muted = true;
+  video.style.objectFit = 'contain';
+}
+
 export async function startWebScan(
   elementId: string,
   callbacks: ScannerCallbacks,
 ): Promise<void> {
-  await stopWebScan();
-  await waitForElement(elementId);
+  return enqueueWebOp(async () => {
+    await safeStopInstance(webScanner);
+    webScanner = null;
 
-  webScanner = new Html5Qrcode(elementId, {
-    verbose: false,
-    experimentalFeatures: {
-      useBarCodeDetectorIfSupported: true,
-    },
-    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-  });
+    const holder = await waitForElement(elementId);
+    // Wipe leftover library DOM from a previous aborted start.
+    holder.innerHTML = '';
 
-  const attempts: Array<MediaTrackConstraints | string> = [
-    { facingMode: { ideal: 'environment' } },
-    { facingMode: 'environment' },
-    { facingMode: 'user' },
-  ];
+    let scanner = new Html5Qrcode(elementId, {
+      verbose: false,
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true,
+      },
+      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+    });
+    webScanner = scanner;
 
-  let lastError: unknown;
-  for (const config of attempts) {
-    try {
-      await startWithCamera(webScanner, config, callbacks);
-      // Ensure inline playback on iOS Safari — do NOT restyle video with
-      // object-fit:cover (that desyncs the decoded region from what the user sees).
-      const video = document.querySelector(
-        `#${elementId} video`,
-      ) as HTMLVideoElement | null;
-      if (video) {
-        video.setAttribute('playsinline', 'true');
-        video.setAttribute('webkit-playsinline', 'true');
-        video.muted = true;
-        video.style.objectFit = 'contain';
-      }
-      return;
-    } catch (err) {
-      lastError = err;
+    const primary = await pickCameraId();
+    const attempts: Array<MediaTrackConstraints | string> = [
+      primary,
+      { facingMode: 'environment' },
+      { facingMode: 'user' },
+    ];
+
+    // Deduplicate identical configs
+    const seen = new Set<string>();
+    const uniqueAttempts = attempts.filter((cfg) => {
+      const key = typeof cfg === 'string' ? `id:${cfg}` : JSON.stringify(cfg);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    let lastError: unknown;
+    for (let i = 0; i < uniqueAttempts.length; i += 1) {
+      const config = uniqueAttempts[i];
       try {
-        if (webScanner.isScanning) await webScanner.stop();
-      } catch {
-        // ignore
+        await startWithCamera(scanner, config, callbacks);
+        tuneVideoElement(elementId);
+        return;
+      } catch (err) {
+        lastError = err;
+        await safeStopInstance(scanner);
+        webScanner = null;
+        // Recreate instance after a failed/partial start (required after clear()).
+        if (i < uniqueAttempts.length - 1) {
+          await delay(250);
+          holder.innerHTML = '';
+          scanner = new Html5Qrcode(elementId, {
+            verbose: false,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true,
+            },
+            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          });
+          webScanner = scanner;
+        }
       }
     }
-  }
 
-  webScanner = null;
-  throw new Error(humanizeCameraError(lastError));
+    webScanner = null;
+    throw new Error(humanizeCameraError(lastError));
+  });
 }
 
 export async function scanQrFromFile(file: File): Promise<string> {
@@ -275,16 +368,11 @@ export async function scanQrFromFile(file: File): Promise<string> {
 }
 
 export async function stopWebScan(): Promise<void> {
-  if (!webScanner) return;
-  try {
-    if (webScanner.isScanning) {
-      await webScanner.stop();
-    }
-    webScanner.clear();
-  } catch {
-    // ignore
-  }
-  webScanner = null;
+  return enqueueWebOp(async () => {
+    const scanner = webScanner;
+    webScanner = null;
+    await safeStopInstance(scanner);
+  });
 }
 
 export async function openAppSettings(): Promise<void> {
