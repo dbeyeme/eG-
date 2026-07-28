@@ -2,7 +2,8 @@
 
 App React (Vite + TypeScript) + Capacitor pour authentifier les billets à l’embarquement via scan QR.
 
-**Version :** `0.2.0`
+**Canal :** `LAB` · **Version :** `0.2.0-lab`  
+> Branche hors production — voir `LAB.md`.
 
 ## Déploiement
 
